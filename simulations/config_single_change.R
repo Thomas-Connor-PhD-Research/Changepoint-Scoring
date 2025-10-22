@@ -1,24 +1,49 @@
-sim_params <- list(
-  simulation_name = "single_change_cauchy_dist", # used to label ouput file
-  n_reps = 1000,
-
-  # Simulation type to run
-  simulation_function = "simulate_single_changepoint", 
-  
-  # Simulation specific parameters
-  n = 1000,
-  burnin = 40, # typically floor(n/25)
-  changepoint_spec = list(
-    tau = 500, # typically floor(n/2)
-    delta = 1
-  ),
-
-  noise_dist = "cauchy",
-  noise_params = list(scale = 1),
-  # Estimators to compute
-  # To add an estimator: new_estimator = list() and write a calculate_new_estim-
-  # ator function in R/simulation_functions.R
-  # Ensure estimators are listed AFTER their dependencies (eg: scoring with 
-  # use_cusum_tau = TRUE after cusum)
-  estimators = list("cusum", "oracle", "scoring", "scoring_known_noise", "iterative_scoring") 
+# Simulation Control Parameters
+simulation_params <- list(
+  simulation_name = "single_change_t_dist_refactored",
+  n_reps = 10,
+  # This simulation function name is now just a label,
+  # the R script directly calls simulate_single_changepoint
+  simulation_function = "simulate_single_changepoint" 
 )
+
+# Data Generation Parameters
+data_params <- list(
+  n = 1000,
+  burnin = 40, # Note: 'burnin' isn't used in your generate_timeseries
+  changepoint_spec = list(
+    tau = 500,
+    delta = 0.3
+  ),
+  noise_dist = "t",
+  noise_params = list(scale = 0.5, df = 3)
+)
+
+# Estimator Parameters
+# A named list where each estimator has its own parameter list.
+estimator_params <- list(
+  
+  # CUSUM takes no parameters
+  # "cusum" = list(), 
+  
+  # Oracle takes no parameters (it gets them from data_params)
+  "oracle" = list(), 
+  
+  # Scoring (1-iteration)
+  "scoring" = list(
+    scoring_method = "spline_df_1se", 
+    iterations = 1
+  ),
+  
+  # Iterative Scoring (3-iterations)
+  "iterative_scoring" = list(
+    scoring_method = "spline_df_min",
+    iterations = 3
+  ),
+  
+  # Scoring with known noise
+  "scoring_known_noise" = list(
+    scoring_method = "spline_df_1se" # Spline-based estimation
+  )
+)
+

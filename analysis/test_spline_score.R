@@ -2,9 +2,14 @@ source("R/noise_distributions.R")
 
 plot_single_estimated_versus_true <- function(n, noise_dist, ...) {
   noise_params <- list(...)
-  noise_sample <- do.call(sample_from_distribution, c(list(n, noise_dist), noise_params))
+  noise_sample <- do.call(sample_from_distribution, list(n = n, 
+                                                         dist = noise_dist, 
+                                                         params = noise_params))
   
-  true_score_fn <- do.call(create_score_function, c(list(noise_dist), noise_params))
+  true_score_fn <- do.call(create_score_function, list(
+    dist = noise_dist, 
+    params = noise_params)
+  )
   
   cv_df <- cv_spline_score(noise_sample)$df_min
   estimated_score_fn <- spline_score(noise_sample, df = cv_df)$rho
@@ -98,17 +103,17 @@ plot_multiple_estimated_versus_true <- function(n, noise_dist, n_reps = 20, ...)
 generate_QQ_plot <- function(n, noise_dist, ...) {
   noise_params <- list(...)
   
-  noise_sample <- do.call(sample_from_distribution, c(list(n, noise_dist), noise_params))
-  
-  true_score_fn <- do.call(create_score_function, c(list(noise_dist), noise_params))
+  noise_sample <- do.call(sample_from_distribution, list(n = n,
+                                                         dist_name = noise_dist, 
+                                                         params = noise_params))
   
   cv_df <- cv_spline_score(noise_sample)$df_min
   estimated_score_fn <- spline_score(noise_sample, df = cv_df)$rho
   
   # The dist of rho(eps) under normal model is N(0, 1/sigma^2)
   if (noise_dist == "normal"){
-    sigma <- noise_params$sigma
-    scaled_estimated_score <- estimated_score_fn * sigma
+    sigma <- noise_params$sd
+    scaled_estimated_score <- estimated_score_fn(noise_sample) * sigma
     plot_title <- paste("Q-Q Plot for", noise_dist, "Noise (n =", n, ", df =", round(cv_df, 2), ")")
     qqnorm(scaled_estimated_score,
            main = plot_title,
@@ -118,3 +123,5 @@ generate_QQ_plot <- function(n, noise_dist, ...) {
     
   }
 }
+
+plot_single_estimated_versus_true(1000, "normal")

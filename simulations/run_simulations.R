@@ -1,7 +1,7 @@
 
 # 1. SETUP
-source("simulations/config_single_change.R") # <-- Only line to be changed
-# source("simulations/config_test_spline_score.R")
+source("simulations/config_score_estimation.R") # <-- Only line to be changed
+
 
 
 library(foreach)
@@ -12,35 +12,50 @@ library(doRNG)
 library(rlang)
 library(rngtools)
 
+#' Sources all .R files in a specified directory
+#'
+#' @param path The path to the folder containing your R scripts.
+source_dir <- function(path) {
+  files <- list.files(path, pattern = "\\.[rR]$", full.names = TRUE)
+  for (file in files) {
+    tryCatch(
+      source(file, local = FALSE), # Source into the worker's global env
+      error = function(e) {
+        warning(paste("Error sourcing", file, ":", e$message))
+      }
+    )
+  }
+}
+
 plan(multisession,
      workers = parallel::detectCores() - 1
 )
-
  registerDoFuture()
  handlers(global = FALSE)
 
 with_progress({
-  p <- progressor(steps = sim_params$n_reps+1)
+  p <- progressor(steps = simulation_params$n_reps+1)
 
-  results_df <- foreach(i = 1:sim_params$n_reps, .combine = rbind) %dorng% {
+  results_df <- foreach(i = 1:simulation_params$n_reps, .combine = rbind) %dorng% {
     set.seed(i) # for reproducability
     
-    # Currently each worker must source all functions
-    # TODO: Fix
-    source("R/simulation_functions.R")
-    source("R/noise_distributions.R")
-    source("R/score_estimation2.R")
-    source("R/scoring_spline_analysis_functions.R")
-    
+    # # Currently each worker must source all functions
+    # # TODO: Fix
+    source_dir("R/")
+
     p()
-    
-    do.call(sim_params$simulation_function, list(params = sim_params))
+     
+    do.call(simulation_params$simulation_function,
+            list(data_params = data_params,
+                 estimator_params = estimator_params))
  }
 })
 
 
 output_data <- list(
-  parameters = sim_params,
+  simulation_parameters = simulation_params,
+  data_params = data_params,
+  estimator_params = estimator_params,
   results = as.data.frame(results_df)
 )
 
@@ -49,7 +64,7 @@ plan(sequential)
 timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 
 filename <- paste0("results/",
-                   sim_params$simulation_name,
+                   simulation_params$simulation_name,
                    "_",
                    timestamp,
                    ".rds")
