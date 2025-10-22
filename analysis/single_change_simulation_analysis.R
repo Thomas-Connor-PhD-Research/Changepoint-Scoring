@@ -84,7 +84,7 @@
   
   error_df <- data.frame(
     Estimator = clean_estimator_names,
-    MEAN = sapply(data[, cols_to_calculate], function(est) mean(est, na.rm = TRUE)),
+    BIAS = sapply(data[, cols_to_calculate], function(est) mean(est - true_value, na.rm = TRUE)),
     MSE = sapply(data[, cols_to_calculate], function(est) mean((est - true_value)^2, na.rm = TRUE)),
     MAE = sapply(data[, cols_to_calculate], function(est) mean(abs(est - true_value), na.rm = TRUE)),
     MaxAE = sapply(data[, cols_to_calculate], function(est) max(abs(est - true_value), na.rm = TRUE)),
@@ -99,7 +99,7 @@
 # --- Main Analysis Function ---
 analyze_simulation_results <- function(simulation_output) {
   results_df <- as.data.frame(simulation_output$results)
-  params <- simulation_output$parameters
+  data_params <- simulation_output$data_params
   
   plot_tau_distributions <- function(...) {
     .plot_distributions(results_df, "tau", "Distribution of Tau Estimators", ...)
@@ -112,11 +112,11 @@ analyze_simulation_results <- function(simulation_output) {
   }
   
   calculate_tau_error <- function(...) {
-    .calculate_error_metrics(results_df, "tau", params$changepoint_spec$tau, ...)
+    .calculate_error_metrics(results_df, "tau", data_params$changepoint_spec$tau, ...)
   }
   
   calculate_delta_error <- function(...){
-    .calculate_error_metrics(results_df, "delta", params$changepoint_spec$delta, ...)
+    .calculate_error_metrics(results_df, "delta", data_params$changepoint_spec$delta, ...)
   }
   
   return(list(
@@ -130,22 +130,17 @@ analyze_simulation_results <- function(simulation_output) {
 
 
 
-results_filename <- "results/single_change_cauchy_dist_2025-10-13_11-37-19.rds"
+results_filename <- "results/single_change_t_dist_refactored_2025-10-21_18-05-49.rds"
 sim_output <- readRDS(results_filename)
 analysis_tools <- analyze_simulation_results(sim_output)
 
 # --- Use Examples ---
 
-# 1. Calculate and print error metrics for all estimators
+
 error_table <- analysis_tools$tau_error()
 print("--- Error Metrics for Tau ---")
 print(error_table)
-cat("\n")
 
-# 2. Plot all tau distributions with histograms
-print("--- Plotting All Tau Distributions ---")
-analysis_tools$plot_tau()
-
-# 3. Plot density ONLY for a subset of estimators
-print("--- Plotting Subset of Estimators (Density Only) ---")
-analysis_tools$plot_tau(estimator_names = c("cusum", "scoring"), plot_hist = FALSE)
+ 
+# analysis_tools$plot_tau()
+# analysis_tools$plot_tau(estimator_names = c("cusum", "scoring"), plot_hist = FALSE)

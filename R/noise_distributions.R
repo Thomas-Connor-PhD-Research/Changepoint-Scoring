@@ -39,7 +39,10 @@
     },
     sampler = function(params){
       function(n) rnorm(n, mean = 0, params$sd)
-    }
+    },
+    stein_fisher_info = function(params){ 
+      1/(params$sd^2)
+      }
   ),
   t = list(
     params = c("df","scale"),
@@ -55,6 +58,9 @@
     },
     sampler = function(params){
       function(n) params$scale*rt(n, df = params$df)
+    },
+    stein_fisher_info = function(params){
+      (params$df + 1)/(params$scale^2*(params$df + 3))
     }
   ),
   laplace = list(
@@ -74,6 +80,9 @@
         u <- runif(n)
         ifelse(u < 0.5, params$scale * log(2 * u), -params$scale * log(2 * (1 - u)))
       }
+    },
+    stein_fisher_info = function(params){
+      (1 / params$scale^2)
     }
   ),
   cauchy = list(
@@ -90,6 +99,9 @@
     },
     sampler = function(params) {
       function(n) rcauchy(n, location = 0, scale = params$scale)
+    },
+    stein_fisher_info = function(params){
+      1 / (2 * params$scale^2)
     }
   ),
   logistic = list(
@@ -106,6 +118,9 @@
     },
     sampler = function(params) {
       function(n) rlogis(n, location = 0, scale = params$scale)
+    },
+    stein_fisher_info = function(params){
+      1 / (3*params$scale^2)
     }
   )
 )
@@ -142,146 +157,10 @@ sample_from_distribution <- function(n, dist_name, params){
   sampler_shell(n)
 }
 
+get_stein_fisher_info <- function(dist_name, params)
+  .create_handler(dist_name, "stein_fisher_info", params)
 
-# 
-# 
-# 
-# # ---- SCORE FUNCTION ----
-# create_score_function <- function(distribution_name, ...) {
-#   params <- list(...)
-#   
-#   if (distribution_name == "normal") {
-#     sd <- params$sd
-#     return(function(x) -x / (sd^2))
-#   }
-#   
-#   if (distribution_name == "t") {
-#     df <- params$df
-#     scale <- params$scale
-#     if (is.null(df)) stop("Degrees of freedom 'df' must be provided for the t-distribution.")
-#     if (is.null(scale)) stop("Scale 'scale' must be provided for the t-distribution.")
-#     return(function(x) -(df + 1) * x / (df*scale^2 + x^2))
-#   }
-#   
-#   if (distribution_name == "laplace") {
-#     return(function(x) -sign(x) / scale)
-#   }
-#   
-#   if (distribution_name == "cauchy") {
-#     scale <- params$scale %||% 1
-#     return(function(x) -2 * x / (scale^2 + x^2))
-#   }
-#   
-#   if (distribution_name == "logistic") {
-#     scale <- params$scale %||% 1
-#     return(function(x) -(1 / (scale)) * tanh(x / (2 * scale)))
-#   }
-#   
-#   stop("Distribution not supported: ", distribution_name)
-# }
-# 
-# # ---- DENSITY FUNCTION ----
-# create_density_function <- function(distribution_name, ...) {
-#   params <- list(...)
-#   
-#   if (distribution_name == "normal") {
-#     sd <- params$sd
-#     return(function(x) dnorm(x / sd) / sd)
-#   }
-#   
-#   if (distribution_name == "t") {
-#     df <- params$df
-#     scale <- params$scale %||% 1
-#     if (is.null(df)) stop("Degrees of freedom 'df' must be provided for the t-distribution.")
-#     return(function(x) dt(x / scale, df = df) / scale)
-#   }
-#   
-#   if (distribution_name == "laplace") {
-#     return(function(x) (1 / (2 * scale)) * exp(-abs(x) / s))
-#   }
-#   
-#   if (distribution_name == "cauchy") {
-#     scale <- params$scale %||% 1
-#     return(function(x) dcauchy(x / scale) / scale)
-#   }
-#   
-#   if (distribution_name == "logistic") {
-#     scale <- params$scale %||% 1
-#     return(function(x) dlogis(x / scale) /  scale)
-#   }
-#   
-#   stop("Distribution not supported: ", distribution_name)
-# }
-# 
-# 
-# # ---- QUANTILE FUNCTION ----
-# create_quantile_function <- function(distribution_name, ...) {
-#   params <- list(...)
-#   
-#   if (distribution_name == "normal") {
-#     sd <- params$sd %||% 1
-#     return(function(p) sd * qnorm(p))
-#   }
-#   
-#   if (distribution_name == "t") {
-#     df <- params$df
-#     scale <- params$scale %||% 1
-#     if (is.null(df)) stop("Degrees of freedom 'df' must be provided for the t-distribution.")
-#     return(function(p) scale * qt(p, df = df))
-#   }
-#   
-#   if (distribution_name == "laplace") {
-#     return(function(p) {
-#       ifelse(p < 0.5,
-#              sd * log(2 * p),
-#              -sd * log(2 * (1 - p)))
-#     })
-#   }
-#   
-#   if (distribution_name == "cauchy") {
-#     scale <- params$scale %||% 1
-#     return(function(p)  scale * qcauchy(p))
-#   }
-#   
-#   if (distribution_name == "logistic") {
-#     scale <- params$scale %||% 1
-#     return(function(p) scale * qlogis(p))
-#   }
-#   
-#   stop("Distribution not supported: ", distribution_name)
-# }
-# 
-# # ---- SAMPLE NOISE ----
-# sample_from_distribution <- function(n, distribution_name, ...) {
-#   params <- list(...)
-#   
-#   if (distribution_name == "normal") {
-#     sd <- params$sd %||% 1
-#     return(sd * rnorm(n))
-#   }
-#   
-#   if (distribution_name == "t") {
-#     scale <- params$scale %||% 1
-#     df <- params$df
-#     if (is.null(df)) stop("Degrees of freedom 'df' must be provided for the t-distribution.")
-#     return(scale * rt(n, df = df))
-#   }
-#   
-#   if (distribution_name == "laplace") {
-#     # via inverse CDF method
-#     u <- runif(n)
-#     return(scale * ifelse(u < 0.5, log(2 * u), -log(2 * (1 - u))))
-#   }
-#   
-#   if (distribution_name == "cauchy") {
-#     scale <- params$scale %||% 1
-#     return(scale * rcauchy(n))
-#   }
-#   
-#   if (distribution_name == "logistic") {
-#     scale <- params$scale %||% 1
-#     return(scale * rlogis(n))
-#   }
-#   
-#   stop("Distribution not supported: ", distribution_name)
-# }
+# -- EXAMPLES --
+dist_name <- "normal"
+params <- c(sd = 1)
+density_fn <- create_density_function(dist_name, params)

@@ -1,139 +1,58 @@
-# ---- ESTIMATOR CALCULATION ----
-calculate_cusum_estimator <- function(Y, params) {
-  transform_fn <- function(y) y
-  test_stat <- generate_test_statistic(Y, transform_fn, params$burnin, params$n)
+simulate_score_mse <- function(data_params, estimator_params) {
+
+  dist_args <- list(
+    dist_name = data_params$noise_dist,
+    params = data_params$noise_params
+  )
   
-  results <- get_max(test_stat, params$burnin)
-  results$delta <- mean(Y[(results$tau + 1):params$n]) - mean(Y[1:results$tau])
-  return(results)
-}
-
-calculate_oracle_estimator <- function(Y, params) {
-  oracle_score_fn <- create_score_function(params$noise_dist, params$noise_params)
-  test_stat <- generate_test_statistic(Y, oracle_score_fn, params$burnin, params$n)
+  # Create the true noise functions
+  true_quantile_fn <- do.call(create_quantile_function, dist_args)
+  true_score_fn <- do.call(create_score_function, dist_args)
+  true_density_fn <- do.call(create_density_function, dist_args)
   
-  results <- get_max(test_stat, params$burnin)
-  results$delta <- mean(Y[(results$tau + 1):params$n]) - mean(Y[1:results$tau])
-  return(results)
-}
-
-calculate_scoring_estimator <- function(Y, params, tau_hat = NULL) {
-  if (is.null(tau_hat)) {
-    tau_hat <- calculate_cusum_estimator(Y, params)$tau
-  }
+  # Define integration grid / pre-calculate true values
+  x_grid <- seq(true_quantile_fn(0.001), true_quantile_fn(0.999), length.out = 2000)
+  grid_spacing <- diff(x_grid)[1]
   
-  noise_est <- Y
-  noise_est[(tau_hat + 1):params$n] <- noise_est[(tau_hat + 1):params$n] - (mean(Y[(tau_hat + 1):params$n]) - mean(Y[1:tau_hat]))
-  scoring_score_fn <- spline_score(noise_est, df = cv_spline_score(noise_est)$df_min)$rho
-  test_stat <- generate_test_statistic(Y, scoring_score_fn, params$burnin, params$n)
+  true_scores_on_grid <- true_score_fn(x_grid)
+  true_density_on_grid <- true_density_fn(x_grid)
   
-  results <- get_max(test_stat, params$burnin)
-  results$delta <- mean(Y[(results$tau + 1):params$n]) - mean(Y[1:results$tau])
-  return(results)
-}
-
-
-calculate_scoring_known_noise_estimator <- function(Y, noise, params){
-  scoring_score_fn <- spline_score(noise, df = cv_spline_score(noise)$df_min)$rho
-  test_stat <- generate_test_statistic(Y, scoring_score_fn, params$burnin, params$n)
-  
-  results <- get_max(test_stat, params$burnin)
-  results$delta <- mean(Y[(results$tau + 1):params$n]) - mean(Y[1:results$tau])
-  return(results)
-}
-
-calculate_iterative_scoring_estimator <- function(Y, params, tau_hat = NULL){
-  results_initial <- calculate_scoring_estimator(Y, params, tau_hat)
-  results <- calculate_scoring_estimator(Y, params, results_initial$tau)
-  results$delta <- mean(Y[(results$tau + 1):params$n]) - mean(Y[1:results$tau])
-  return(results)
-}
-
-
-# TO BE IMPLEMENTED
-calculate_scoring_sample_split_estimator <- function(Y, noise, params){
-  odd_indicies <- seq(1, params$n, by=2)
-  even_indicies <- seq(1, params$n, by=2)
-  
-  Y_odd <- Y[odd_indicies]
-  Y_even <- Y[even_indicies]
-  
-
-  tau_hat <- calculate_cusum_estimator(Y, params)$tau
-  noise_est <- Y
-  noise_est[(tau_hat + 1):params$n] <- noise_est[(tau_hat + 1):params$n] - (mean(Y[(tau_hat + 1):params$n]) - mean(Y[1:tau_hat]))
-}
-
-# TO BE IMPLEMENTED
-calculate_trimmed_scoring_estimator <- function(Y, params, tau_hat){
-  if (is.null(tau_hat)) {
-    tau_hat <- calculate_cusum_estimator(Y, params)$tau
-  }
-  
-  noise_est <- Y
-  noise_est[(tau_hat + 1):params$n] <- noise_est[(tau_hat + 1):params$n] - (mean(Y[(tau_hat + 1):params$n]) - mean(Y[1:tau_hat]))
-  scoring_score_fn <- spline_score(noise_est, df = cv_spline_score(noise_est)$df_min)$rho
-  test_stat <- generate_test_statistic(Y, scoring_score_fn, params$burnin, params$n)
-  
-  results <- get_max(test_stat, params$burnin)
-  return(results)
-}
-
-# Generates generic generalised-CUSUM test statistic
-generate_test_statistic <- function(Y, transform_fn, burnin, n) {
-  transformed_Y <- transform_fn(Y)
-  denom <- ((burnin + 1):(n - burnin)) * (1 - ((burnin + 1):(n - burnin)) / n)
-  unscaled_stat <- cumsum(transformed_Y - mean(transformed_Y))[(burnin + 1):(n - burnin)]
-  return(unscaled_stat^2 / denom)
-}
-
-get_max <- function(teststat, burnin) {
-  list(tau = which.max(teststat) + burnin, max = max(teststat))
-}
-
-
-# ---- SIMULATION FUNCTION ----
-simulate_single_changepoint <- function(params) {
-  # Generate observations 
-  noise <- sample_from_distribution(params$n, params$noise_dist, params$noise_params)
-  Y <- noise
-  Y[(params$changepoint_spec$tau + 1):params$n] <- Y[(params$changepoint_spec$tau + 1):params$n] + params$changepoint_spec$delta
-  
-  # Loop through and run the requested estimators
-  # NOTE: Order should obey dependencies
+  # Initialise result list
   results_list <- list()
-  if ("cusum" %in% params$estimators){
-    results_list[["cusum"]] <- calculate_cusum_estimator(Y, params)
-  } 
-  
-  if ("oracle" %in% params$estimators){
-    results_list[["oracle"]] <- calculate_oracle_estimator(Y, params)
+  for (estimator_name in names(estimator_params)) {
+    results_list[[estimator_name]] <- list()
   }
   
-  if ("scoring_known_noise" %in% params$estimators){
-    results_list[["scoring_known_noise"]] <- calculate_scoring_known_noise_estimator(Y, noise, params)
-  }
-  
-  
-  if ("scoring" %in% params$estimators){
-    tau_hat <- results_list[["cusum"]]$tau # NULL if does to exist
-
-    results_list[["scoring"]] <- calculate_scoring_estimator(Y, params, tau_hat)
-  }
-  
-  if ("iterative_scoring" %in% params$estimators){
-    tau_hat <- results_list[["cusum"]]$tau # NULL if does to exist
+  # Main calculation loop
+  for (n in data_params$n_values) {
     
-    results_list[["iterative_scoring"]] <- calculate_iterative_scoring_estimator(Y, params, tau_hat)
+    # Generate the data sample ONCE for the current n
+    noise_sample <- do.call(sample_from_distribution, list(
+      n = n,
+      dist_name = data_params$noise_dist,
+      params = data_params$noise_params
+    ))
+    
+    # INNER loop through estimators for the SAME data sample
+    for (estimator_name in names(estimator_params)) {
+      
+
+      if (estimator_name %in% c("spline_df_min", "spline_df_1se", "asm")) {
+        estimated_score_fn <- score_estimation(noise_sample, estimator_name)
+      } else {
+        stop(paste("Unknown estimator specified:", estimator_name))
+      } # Change to a do.call in future if necessary
+      
+      # Calculate density-weighted squared error (approximate integral)
+      estimated_scores_on_grid <- estimated_score_fn(x_grid)
+      squared_errors <- (true_scores_on_grid - estimated_scores_on_grid)^2
+      integral_approx <- sum(squared_errors * true_density_on_grid) * grid_spacing
+      
+      results_list[[estimator_name]][[as.character(n)]] <- integral_approx
+    }
   }
   
-  
-  
-  # Combine results from all estimators into single vector
   return(unlist(results_list))
 }
 
-simulate_multiple_changepoints <- function(params) {
-  message("Multiple changepoint simulation not yet implemented.")
-  return(NULL)
-}
+
