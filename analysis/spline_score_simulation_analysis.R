@@ -1,3 +1,7 @@
+library(dplyr)
+library(tibble) 
+library(ggplot2)
+
 get_summary_data <- function(results_data) {
 
   sample_sizes <- as.numeric(names(results_df))
@@ -95,11 +99,6 @@ plot_mse_histogram <- function(results_data, n_to_plot) {
     return(invisible(NULL))
   }
 
-# --- Load necessary libraries ---
-# You will need dplyr for grouping and summarizing.
-# If you don't have it, run: install.packages("dplyr")
-library(dplyr)
-library(tibble) # Only if you need rownames_to_column, which we don't here.
 
 #' @title Get summary statistics using a parameter list
 #' @param results_data A data frame where rows are simulation runs
@@ -108,12 +107,12 @@ library(tibble) # Only if you need rownames_to_column, which we don't here.
 #'   This function uses `sim_params$estimators` and `sim_params$n_values`.
 #' @return A tidy data frame (tibble) with summary statistics
 #'   grouped by method and sample size.
-get_long_data <- function(results_data, sim_params) {
+get_long_data <- function(results_data, data_params, estimator_params) {
   
   all_results_list <- list()
   
-  for (est_name in sim_params$estimators) {
-    for (n_val in sim_params$n_values) {
+  for (est_name in names(estimator_params)) {
+    for (n_val in data_params$n_values) {
       
       col_name <- paste(est_name, n_val, sep = ".")
       
@@ -194,18 +193,19 @@ generate_mse_box_plot <- function(long_data){
 }
 
 
-results_address <- "results/score_estimation_normal_dist_2025-10-18_10-49-41.rds"
+results_address <- "results/score_est_t_multiple_se_2025-10-22_12-02-22.rds"
+results_address <- "results/score_est_normal_multiple_se_2025-10-22_11-55-46.rds"
 results_file <- readRDS(results_address)
 
-params <- results_file$parameters
+data_params <- results_file$data_params
+estimator_params <- results_file$estimator_params
 results <- results_file$results
 
-long_data <- get_long_data(results, params)
-print(long_data)
+long_data <- get_long_data(results, data_params, estimator_params)
 summary_data <- get_summary_df(long_data)
 mse_plot <- generate_mse_box_plot(long_data)
 print(mse_plot)
- 
+print(summary_data)
 # results_df <- as.data.frame(results_data$results)
 # summary_df <- get_summary_data(results_data)
 # print(summary_df)

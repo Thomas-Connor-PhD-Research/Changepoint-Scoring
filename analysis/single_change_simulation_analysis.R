@@ -84,14 +84,15 @@
   
   error_df <- data.frame(
     Estimator = clean_estimator_names,
+    RMSE = sapply(data[, cols_to_calculate], function(est) sqrt(mean((est - true_value)^2, na.rm = TRUE))),
     BIAS = sapply(data[, cols_to_calculate], function(est) mean(est - true_value, na.rm = TRUE)),
-    MSE = sapply(data[, cols_to_calculate], function(est) mean((est - true_value)^2, na.rm = TRUE)),
+    VAR = sapply(data[,cols_to_calculate], function(est) var(est, na.rm = TRUE)),
     MAE = sapply(data[, cols_to_calculate], function(est) mean(abs(est - true_value), na.rm = TRUE)),
     MaxAE = sapply(data[, cols_to_calculate], function(est) max(abs(est - true_value), na.rm = TRUE)),
     row.names = NULL
   )
 
-  error_df <- error_df[order(error_df$MSE), ]
+  error_df <- error_df[order(error_df$RMSE), ]
   
   return(error_df)
 }
@@ -130,17 +131,28 @@ analyze_simulation_results <- function(simulation_output) {
 
 
 
-results_filename <- "results/single_change_t_dist_refactored_2025-10-21_18-05-49.rds"
+
+results_filename <- "results/rate_estimation_bimodal_delta_n0-25_multiple_2025-10-29_17-19-05.rds"
 sim_output <- readRDS(results_filename)
 analysis_tools <- analyze_simulation_results(sim_output)
 
-# --- Use Examples ---
 
-
+# Display error metrics
 error_table <- analysis_tools$tau_error()
 print("--- Error Metrics for Tau ---")
 print(error_table)
+print('True Tau Value:')
+print(sim_output$data_params$changepoint_spec$tau)
 
- 
-# analysis_tools$plot_tau()
-# analysis_tools$plot_tau(estimator_names = c("cusum", "scoring"), plot_hist = FALSE)
+error_table_delta <- analysis_tools$delta_error()
+print("--- Error Metrics for Delta ---")
+print(error_table_delta)
+print('True Delta Value:')
+print(sim_output$data_params$changepoint_spec$delta)
+
+# Display maximum differences between scoring and oracle
+df <- sim_output$results
+abs_diff <- abs(df$oracle.tau - 500)
+names(abs_diff) <- rownames(df)
+top_differences <- sort(abs_diff, decreasing = TRUE)[1:10]
+print(top_differences)

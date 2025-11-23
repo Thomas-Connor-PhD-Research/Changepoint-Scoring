@@ -1,4 +1,4 @@
-simulate_score_mse <- function(data_params, estimator_params) {
+simulate_score_mse <- function(data_params, estimator_params, seed) {
 
   dist_args <- list(
     dist_name = data_params$noise_dist,
@@ -18,8 +18,10 @@ simulate_score_mse <- function(data_params, estimator_params) {
   true_density_on_grid <- true_density_fn(x_grid)
   
   # Initialise result list
+  
+  estimators <- names(estimator_params)
   results_list <- list()
-  for (estimator_name in names(estimator_params)) {
+  for (estimator_name in estimators) {
     results_list[[estimator_name]] <- list()
   }
   
@@ -33,16 +35,13 @@ simulate_score_mse <- function(data_params, estimator_params) {
       params = data_params$noise_params
     ))
     
+    estimated_score_fn_list <- score_estimation(noise_sample, estimators)
+    
     # INNER loop through estimators for the SAME data sample
-    for (estimator_name in names(estimator_params)) {
+    for (estimator_name in estimators) {
       
 
-      if (estimator_name %in% c("spline_df_min", "spline_df_1se", "asm")) {
-        estimated_score_fn <- score_estimation(noise_sample, estimator_name)
-      } else {
-        stop(paste("Unknown estimator specified:", estimator_name))
-      } # Change to a do.call in future if necessary
-      
+      estimated_score_fn <- estimated_score_fn_list[[estimator_name]]
       # Calculate density-weighted squared error (approximate integral)
       estimated_scores_on_grid <- estimated_score_fn(x_grid)
       squared_errors <- (true_scores_on_grid - estimated_scores_on_grid)^2

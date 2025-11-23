@@ -1,9 +1,6 @@
 
 # 1. SETUP
-source("simulations/config_score_estimation.R") # <-- Only line to be changed
-
-
-
+source("simulations/config_single_change_rate_estimation.R") # <-- Only line to be chang
 library(foreach)
 library(progressr)
 library(future)
@@ -30,15 +27,16 @@ source_dir <- function(path) {
 plan(multisession,
      workers = parallel::detectCores() - 1
 )
- registerDoFuture()
- handlers(global = FALSE)
+registerDoFuture()
+handlers(global = TRUE)
+handlers("progress")
 
+set.seed(simulation_params$seed)
+ 
 with_progress({
   p <- progressor(steps = simulation_params$n_reps+1)
 
   results_df <- foreach(i = 1:simulation_params$n_reps, .combine = rbind) %dorng% {
-    set.seed(i) # for reproducability
-    
     # # Currently each worker must source all functions
     # # TODO: Fix
     source_dir("R/")
@@ -48,6 +46,7 @@ with_progress({
     do.call(simulation_params$simulation_function,
             list(data_params = data_params,
                  estimator_params = estimator_params))
+    
  }
 })
 

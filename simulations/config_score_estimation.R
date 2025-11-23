@@ -9,19 +9,22 @@
 # )
 
 simulation_params <- list(
-  simulation_name = "score_est_normal",
-  n_reps = 100,
-  simulation_function = "simulate_score_mse"
+  simulation_name = "score_est_t_multiple_se",
+  n_reps = 10,
+  simulation_function = "simulate_score_mse",
+  seed = 123
 )
 
 data_params <- list(
   n_values = c(250, 500, 1000, 2000),
-  noise_dist = "normal",
-  noise_params = list(sd = 1)
+  noise_dist = "t",
+  noise_params = list(scale = 0.5, df = 3)
 )
 
 estimator_params <- list(
   "asm" = list(),
   "spline_df_min" = list(),
-  "spline_df_1se" = list()
+  "spline_df_1se" = list(),
+  "spline_df_2se" = list(),
+  "spline_df_3se" = list()
 )

@@ -138,17 +138,29 @@ cv_spline_score <- function(x, df=2:15, nfolds=5L, tol=1e-3, nmax=NULL, foldid=N
   se <- apply(cv_folds,2,stats::sd)/sqrt(nfolds)
   
   dfmin_index <- which.min(cv)
-  cv_target <- cv[dfmin_index]+se[dfmin_index]
-  df1se_index <- which(df==min(df[cv < cv_target]))
+  
+  cv_target_1se <- cv[dfmin_index]+se[dfmin_index]
+  df1se_index <- which(df==min(df[cv < cv_target_1se]))
+  
+  cv_target_2se <- cv[dfmin_index]+2*se[dfmin_index]
+  df2se_index <- which(df==min(df[cv < cv_target_2se]))
+  
+  cv_target_3se <- cv[dfmin_index]+3*se[dfmin_index]
+  df3se_index <- which(df==min(df[cv < cv_target_3se]))
+  
   
   df_min <- df[dfmin_index]
   df_1se <- df[df1se_index]
+  df_2se <- df[df2se_index]
+  df_3se <- df[df3se_index]
   
   return(list('df'=df,
               'cv'=cv,
               'se'=se,
               'df_min'=df_min,
-              'df_1se'=df_1se))
+              'df_1se'=df_1se,
+              'df_2se'=df_2se,
+              'df_3se'=df_3se))
   
 }
 
@@ -335,17 +347,65 @@ kde_decr_score_est <- function(residuals, quantile = NULL, k = 3000, kernel_pts 
   return(iso_res)
 }
 
-score_estimation <- function(x, scoring_type){
-  if (scoring_type == "asm"){
-    return(kde_decr_score_est(x))
+# This can be improved to only calculate cv_spline_score(x) once if both
+# spline_df_min and spline_df_1se are called
+# score_estimation <- function(x, scoring_type){
+#   if (scoring_type == "asm"){
+#     return(kde_decr_score_est(x))
+#   }
+#   
+#   if (scoring_type == "spline_df_min"){
+#     return(spline_score_estimation(x, df = cv_spline_score(x)$df_min)$rho)
+#   }
+#   
+#   if  (scoring_type == "spline_df_1se"){
+#     return(spline_score_estimation(x, df = cv_spline_score(x)$df_1se)$rho)
+#   }
+# }
+
+score_estimation <- function(x, scoring_types) {
+  
+  # Ensure scoring_types is a character vector
+  scoring_types <- as.character(scoring_types)
+  
+  # Optimization: Pre-calculate spline CV results *once* if needed.
+  cv_res <- NULL 
+  if (any(c("spline_df_min", "spline_df_1se") %in% scoring_types)) {
+    cv_res <- cv_spline_score(x)
   }
   
-  if (scoring_type == "spline_df_min"){
-    return(spline_score_estimation(x, df = cv_spline_score(x)$df_min)$rho)
-  }
+  # Use lapply to iterate over each scoring_type
+  results_list <- lapply(scoring_types, function(st) {
+    
+    # switch() is a clean way to handle multiple string conditions
+    switch(st,
+           "asm" = {
+             kde_decr_score_est(x)
+           },
+           "spline_df_min" = {
+             spline_score_estimation(x, df = cv_res$df_min)$rho
+           },
+           "spline_df_1se" = {
+             spline_score_estimation(x, df = cv_res$df_1se)$rho
+           },
+           "spline_df_2se" = {
+             spline_score_estimation(x, df = cv_res$df_2se)$rho
+           },
+           "spline_df_3se" = {
+             spline_score_estimation(x, df = cv_res$df_3se)$rho
+           },
+           # Default case for any unknown scoring_type
+           {
+             warning(paste("Unknown scoring_type:", st, "- returning NULL"))
+             NULL
+           }
+    )
+  })
   
-  if  (scoring_type == "spline_df_1se"){
-    return(spline_score_estimation(x, df = cv_spline_score(x)$df_1se)$rho)
-  }
+  # Name the output list with the scoring types for easy access
+  names(results_list) <- scoring_types
+  
+  return(results_list)
 }
+
 
