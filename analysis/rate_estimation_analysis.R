@@ -7,11 +7,6 @@ library(tidyr)
 library(dplyr)
 library(broom)
 
-# ------------------------------------------------------------
-# Helper: Riemann zeta(3) constant (approximate)
-#   Used for the theoretical Bayes RMSE:
-#     4 * sqrt(zeta(3)) / r^2
-# ------------------------------------------------------------
 zeta_3_value <- function() {
   # Numeric value of Riemann zeta(3)
   1.2020569031595942854
